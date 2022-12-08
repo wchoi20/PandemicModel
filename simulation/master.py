@@ -13,6 +13,8 @@ import sciris as sc
 from bisect import bisect_left
 import xlrd
 import requests
+from calcInfectionsHomes import calcInfectionsHomes
+import timeit
 
 
 
@@ -61,14 +63,14 @@ class MasterController:
     #                   Basically use this for print statements in places that won't immediately clog the terminal with thousands of lines of output
     generalDebugMode = False
     #####
-     
+
     def getUserInput(self, state, county, interventions):
         '''
         This function will assign the state, county, and interventions as the user specifies
         Params:
             state - the state passed by the user
             county - the county passed by the user
-            interventions - an dictionary of values corresponding to certain interventions 
+            interventions - an dictionary of values corresponding to certain interventions
         '''
         self.state = state
         self.county = county
@@ -80,7 +82,7 @@ class MasterController:
         Params:
             state - the state passed by the user
             county - the county passed by the user
-            interventions - an dictionary of values corresponding to certain interventions 
+            interventions - an dictionary of values corresponding to certain interventions
         '''
         return Module(self.state, self.county, self.interventions)
 
@@ -94,7 +96,7 @@ class MasterController:
         if self.timeOfDay == 23:
             self.dayOfWeek = self.dayOfWeek + 1
         self.timeOfDay = (self.timeOfDay + 1) % 24
-   
+
     def excelToJson(self, excelfile, jsonfile):
         '''
         WILL BE REMOVED
@@ -134,7 +136,7 @@ class MasterController:
         return file
 
     def jsonResponse(self, response):
-        ''' 
+        '''
         Form json response
         Usage:
             jsonResponse(infectionInFacilitiesHourly)
@@ -191,60 +193,60 @@ class MasterController:
         '''
         return self.BinSearch(item_list, item) != -1
 
-    def calcInfectionsHomes(self, atHomeIDs, Pop, currentInfected):
-        '''
-        Used in the simulation() function. Is responsible for handling the spread of infection within household groups.
-        Params:
-            atHomeIDs - list of people who are at home
-            Pop - list of people in the population
-            currentInfected - list of people who are currently infected
-        Returns:
-            (list): list of people who are infected
-        '''
-        numperhour = 0
-        newlyinfectedathome = []
-
-        # TODO: this math needs to be worked out more, along with correct, scientific numbers
-
-        ##### generalDebugMode #####
-        if self.generalDebugMode:
-            print('===master.py/calcInfectionsHomes: currentInfected length is ', len(currentInfected),'===')
-        ##### generalDebugMode #####
-
-        # For each person that's currently infected, we have to loop through their household group and calculate the chance that
-        # the people they share living spaces with get infected
-        for current in currentInfected:
-            
-            if self.in_list(atHomeIDs, current.getID()) and 0 <= current.getInfectionState() <= 3:
-                household_group = list(current.getHouseholdMembers()) #id's #someone should check that this list is behaving 7/14
-                r = random.randint(1,24)
-                if r <= 2:
-                    # Right now, r determines the chance that someone in household_group gets put on infection track
-                    neighborhouse = list(current.getextendedhousehold())[random.randint(0, len(current.getextendedhousehold())-1)]
-                    for each in Pop[neighborhouse].getHouseholdMembers():
-                        household_group.append(each)
-
-                for each in household_group:
-
-                    ##### loopDebugMode #####
-                    if self.loopDebugMode:
-                        print('===master.py/calcInfectionsHomes: looping household_group===')
-                    ##### loopDebugMode #####
-
-                    if len(Pop[each].getInfectionTrack()) > 0:
-                        continue
-                    if (Pop[each].getVaccinatedStatus()):
-                        householdRandomVariable = 20 * random.random() # Multiplying by 20 increases householdRandomVariable, decreasing the chance of infection
-                    else:
-                        householdRandomVariable = random.random()
-
-                    if (householdRandomVariable < (self.averageHouseholdInfectionRate / (24 * (len(
-                            current.getInfectionTrack()) - current.getIncubation()))) and self.in_list(atHomeIDs, each)):  # Probability of infection if in same house at the moment
-                        Pop[each].assignTrajectory()
-                        newlyinfectedathome.append(Pop[each])
-                        numperhour += 1
-
-        return newlyinfectedathome
+    # def calcInfectionsHomes(self, atHomeIDs, Pop, currentInfected):
+    #     '''
+    #     Used in the simulation() function. Is responsible for handling the spread of infection within household groups.
+    #     Params:
+    #         atHomeIDs - list of people who are at home
+    #         Pop - list of people in the population
+    #         currentInfected - list of people who are currently infected
+    #     Returns:
+    #         (list): list of people who are infected
+    #     '''
+    #     numperhour = 0
+    #     newlyinfectedathome = []
+    #
+    #     # TODO: this math needs to be worked out more, along with correct, scientific numbers
+    #
+    #     ##### generalDebugMode #####
+    #     if self.generalDebugMode:
+    #         print('===master.py/calcInfectionsHomes: currentInfected length is ', len(currentInfected),'===')
+    #     ##### generalDebugMode #####
+    #
+    #     # For each person that's currently infected, we have to loop through their household group and calculate the chance that
+    #     # the people they share living spaces with get infected
+    #     for current in currentInfected:
+    #
+    #         if self.in_list(atHomeIDs, current.getID()) and 0 <= current.getInfectionState() <= 3:
+    #             household_group = list(current.getHouseholdMembers()) #id's #someone should check that this list is behaving 7/14
+    #             r = random.randint(1,24)
+    #             if r <= 2:
+    #                 # Right now, r determines the chance that someone in household_group gets put on infection track
+    #                 neighborhouse = list(current.getextendedhousehold())[random.randint(0, len(current.getextendedhousehold())-1)]
+    #                 for each in Pop[neighborhouse].getHouseholdMembers():
+    #                     household_group.append(each)
+    #
+    #             for each in household_group:
+    #
+    #                 ##### loopDebugMode #####
+    #                 if self.loopDebugMode:
+    #                     print('===master.py/calcInfectionsHomes: looping household_group===')
+    #                 ##### loopDebugMode #####
+    #
+    #                 if len(Pop[each].getInfectionTrack()) > 0:
+    #                     continue
+    #                 if (Pop[each].getVaccinatedStatus()):
+    #                     householdRandomVariable = 20 * random.random() # Multiplying by 20 increases householdRandomVariable, decreasing the chance of infection
+    #                 else:
+    #                     householdRandomVariable = random.random()
+    #
+    #                 if (householdRandomVariable < (self.averageHouseholdInfectionRate / (24 * (len(
+    #                         current.getInfectionTrack()) - current.getIncubation()))) and self.in_list(atHomeIDs, each)):  # Probability of infection if in same house at the moment
+    #                     Pop[each].assignTrajectory()
+    #                     newlyinfectedathome.append(Pop[each])
+    #                     numperhour += 1
+    #
+    #     return newlyinfectedathome
 
     def update_status(self, interventions, currentInfected, tested):
         '''
@@ -278,7 +280,7 @@ class MasterController:
                 if r <= interventions["dailyTesting"] / 100 * .1 + (interventions["dailyTesting"] / 100) * (
                         interventions["contactTracing"] / 100) * .1:
                     tested.add(person)
-            
+
         for person in toremove:
             #### Debug added 7/14 ####
             if self.loopDebugMode:
@@ -381,7 +383,7 @@ class MasterController:
             daysDict: dictionary of days
             openHours: list of open hours
             Pop: list of people in the population
-            isAnytown: boolean, whether or not the simulation is in the Anytown scenario                    
+            isAnytown: boolean, whether or not the simulation is in the Anytown scenario
         '''
         # TODO: retention rate within facilities- currently no one stays in a facility longer than one hour, pending ML team
 
@@ -412,8 +414,10 @@ class MasterController:
             # Move agents throughout facilities
             facilities, notAssigned = self.move_people(facilities, Pop, interventions, daysDict, openHours, dayOfWeek, hourOfDay, h, isAnytown)
 
-            # Updating the list of people infected via spread within household 
-            infectedathome = self.calcInfectionsHomes(notAssigned, Pop, currentInfected)
+            # Updating the list of people infected via spread within household
+            # infectedathome = self.calcInfectionsHomes(notAssigned, Pop, currentInfected)
+
+            infectedathome = calcInfectionsHomes(notAssigned, Pop, currentInfected, self.generalDebugMode, self.loopDebugMode, self.averageHouseholdInfectionRate)
 
             # Update the currentInfected list for the whole simulation
             for each in infectedathome:
@@ -424,7 +428,7 @@ class MasterController:
                 currentInfected.add(each)
 
             numinfectedathome = len(infectedathome) # Updating the number of infections that occured in households this timestep
-            houseinfections += numinfectedathome 
+            houseinfections += numinfectedathome
 
             # Updating the list that keeps track of household infections throughout course of simulation
             if h == 0:
@@ -496,7 +500,7 @@ class MasterController:
          Set intervention list based on dictionary of interventions
             Params:
                 intervention_list: dictionary of interventions
-            Returns: 
+            Returns:
                 interventions: dictionary of interventions with updated values
         '''
         if intervention_list is None:
@@ -551,7 +555,7 @@ class MasterController:
         if city == 'Anytown':
             initialInfected = 10
         else:
-            initialInfected = 100 
+            initialInfected = 100
 
         # Population created and returned as array of People class objects
         Pop = M.createPopulation(city)
@@ -564,7 +568,7 @@ class MasterController:
         numVaccinated = math.floor( (len(Pop) * interventions["vaccinatedPercent"])/100)
 
         # Assign initial infection state status for each person
-        
+
         notInfected = [*range(len(Pop))] # list from 1 to num in pop
         for i in range(initialInfected):
             nextInfected = notInfected.pop(random.randint(0,
@@ -582,7 +586,7 @@ class MasterController:
 
 
         # Instantiate submodules with format {id: submodule}, int, {hour: set of facilities open}
-        facilities, totalFacilityCapacities, openHours = M.createFacilitiesCSV('core_poi_OKCity.csv') 
+        facilities, totalFacilityCapacities, openHours = M.createFacilitiesCSV('core_poi_OKCity.csv')
 
         # facilities, totalFacilityCapacities, openHours = M.createFacilities('submodules2.json')
 
@@ -769,19 +773,19 @@ class MasterController:
         # Uncomment the line below to print out the list of sums
         # print(totals)
 
-        
+
     #TODO: use this to get the simulation results from the database
     #def httpRequest(self):
         # Make a GET request
         #r = requests.get('https://www.youtube.com/watch?v=dQw4w9WgXcQ')
         # Guys... you're a genius.
-        
+
 
         # Check for error
         #if (r != 200):
             #print("Error sending HTTP request")
             #return
-        
+
         # Print content
         #print(r.content)
 
@@ -791,6 +795,8 @@ class MasterController:
         return file
 
 if __name__ == '__main__':
+
+    start = timeit.default_timer()
 
     mc = MasterController()  # Instantiate a MasterController
 
@@ -803,3 +809,7 @@ if __name__ == '__main__':
     mc.Anytown(print_infection_breakdown=False, num_days=61, intervention_list=interventions)  # Run entire simulation for 61 days
 
     mc.excelToJson('OKC Data.xls', 'OKC Data.json')
+
+    stop = timeit.default_timer()
+
+    print('Time: ', stop - start)
